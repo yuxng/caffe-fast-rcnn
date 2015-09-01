@@ -34,6 +34,7 @@ def _Net_params(self):
     parameters indexed by name; each is a list of multiple blobs (e.g.,
     weights and biases)
     """
+    
     return OrderedDict([(name, lr.blobs)
                         for name, lr in zip(self._layer_names, self.layers)
                         if len(lr.blobs) > 0])
