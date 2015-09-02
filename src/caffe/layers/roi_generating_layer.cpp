@@ -20,11 +20,24 @@ template <typename Dtype>
 void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) 
 {
-  const Dtype* bottom_data = bottom[0]->cpu_data();
-  const Dtype* bottom_rois = bottom[1]->cpu_data();
+  const Dtype* bottom_heatmap = bottom[0]->cpu_data();
+  const Dtype* bottom_gt_rois = bottom[1]->cpu_data();
+  const Dtype* bottom_gt_labels = bottom[2]->cpu_data();
+  const Dtype* bottom_gt_bbox_targets = bottom[3]->cpu_data();
+  const Dtype* bottom_bbox_loss_weights = bottom[4]->cpu_data();
+  const Dtype* bottom_gt_sublabels = bottom[5]->cpu_data();
+  const Dtype* bottom_gt_overlaps = bottom[6]->cpu_data();
+  const Dtype* bottom_boxes_grid = bottom[7]->cpu_data();
+  const Dtype* bottom_heatmap_size = bottom[8]->cpu_data();
+  const Dtype* bottom_parameters = bottom[9]->cpu_data();
+
   // Number of ROIs
+  int num_images = bottom[8]->num();
+  int num_batches = bottom[0]->num();
+  int num_batches_per_image = num_batches / num_images;
+
   int num_rois = bottom[1]->num();
-  int batch_size = bottom[0]->num();
+
   int top_count = top[0]->count();
   Dtype* top_data = top[0]->mutable_cpu_data();
   caffe_set(top_count, Dtype(-FLT_MAX), top_data);
