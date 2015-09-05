@@ -328,6 +328,7 @@ message LayerParameter {
   optional ReLUParameter relu_param = 123;
   optional ReshapeParameter reshape_param = 133;
   optional ROIPoolingParameter roi_pooling_param = 8266711;
+  optional ROIGeneratingParameter roi_generating_param = 8266712;
   optional SigmoidParameter sigmoid_param = 124;
   optional SoftmaxParameter softmax_param = 125;
   optional SliceParameter slice_param = 126;
@@ -763,6 +764,14 @@ message ROIPoolingParameter {
   // Multiplicative spatial scale factor to translate ROI coords from their
   // input scale to the scale used when pooling
   optional float spatial_scale = 3 [default = 1];
+}
+
+// Message that stores parameters used by ROIGeneratingLayer
+message ROIGeneratingParameter {
+  optional uint32 batch_size = 1 [default = 64]; // The batch size in training
+  optional uint32 num_classes = 2 [default = 2]; // The number of classes
+  optional float fg_fraction = 3 [default = 0.25]; // The fraction of positive examples
+  optional float spatial_scale = 4 [default = 0.0625];
 }
 
 // Message that stores parameters used by SigmoidLayer

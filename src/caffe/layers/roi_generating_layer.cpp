@@ -5,7 +5,9 @@
 // Written by Yu Xiang
 // ------------------------------------------------------------------
 
-#include <cfloat>
+# include <cfloat>
+# include <assert.h>
+# include <stdio.h>
 
 #include "caffe/roi_generating_layers.hpp"
 
@@ -13,115 +15,292 @@ using std::max;
 using std::min;
 using std::floor;
 using std::ceil;
+using std::cout;
+
 
 namespace caffe {
+
+template <typename Dtype>
+void ROIGeneratingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) {
+  ROIGeneratingParameter roi_generating_param = this->layer_param_.roi_generating_param();
+
+  CHECK_GT(roi_generating_param.batch_size(), 0)
+      << "batch size must be > 0";
+
+  batch_size_ = roi_generating_param.batch_size();
+  num_classes_ = roi_generating_param.num_classes();
+  fg_fraction_ = roi_generating_param.fg_fraction();
+  spatial_scale_ = roi_generating_param.spatial_scale();
+}
+
+template <typename Dtype>
+void ROIGeneratingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) 
+{
+  num_ = bottom[0]->num();
+  channels_ = bottom[0]->channels();
+  height_ = bottom[0]->height();
+  width_ = bottom[0]->width();
+
+  // rois
+  top[0]->Reshape(batch_size_, 5, 1, 1);
+  // rois_sub
+  top[1]->Reshape(batch_size_, 5, 1, 1);
+  // labels
+  top[2]->Reshape(batch_size_, 1, 1, 1);
+  // bbox targets
+  top[3]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
+  // bbox loss weights
+  top[4]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
+  // sublabels
+  top[5]->Reshape(batch_size_, 1, 1, 1);
+}
 
 template <typename Dtype>
 void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) 
 {
-  const Dtype* bottom_heatmap = bottom[0]->cpu_data();
-  const Dtype* bottom_gt_rois = bottom[1]->cpu_data();
-  const Dtype* bottom_gt_labels = bottom[2]->cpu_data();
-  const Dtype* bottom_gt_bbox_targets = bottom[3]->cpu_data();
-  const Dtype* bottom_bbox_loss_weights = bottom[4]->cpu_data();
-  const Dtype* bottom_gt_sublabels = bottom[5]->cpu_data();
-  const Dtype* bottom_gt_overlaps = bottom[6]->cpu_data();
-  const Dtype* bottom_boxes_grid = bottom[7]->cpu_data();
-  const Dtype* bottom_heatmap_size = bottom[8]->cpu_data();
-  const Dtype* bottom_parameters = bottom[9]->cpu_data();
+  const Dtype* bottom_parameters = bottom[2]->cpu_data();
+  std::vector<std::pair<Dtype, int> > heatmap;
 
-  // Number of ROIs
-  int num_images = bottom[8]->num();
-  int num_batches = bottom[0]->num();
-  int num_batches_per_image = num_batches / num_images;
+  // parse parameters
+  int num_scale = int(bottom_parameters[0]);
+  int num_aspect = int(bottom_parameters[1]);
+  const Dtype* scales = bottom_parameters + 2;
+  const Dtype* scale_mapping = bottom_parameters + 2 + num_scale;
+  const Dtype* aspect_heights = bottom_parameters + 2 + 2 * num_scale;
+  const Dtype* aspect_widths = bottom_parameters + 2 + 2 * num_scale + num_aspect;
 
-  int num_rois = bottom[1]->num();
+  // debugging
+  cout << "num_scale: " << num_scale << std::endl;
+  cout << "num_aspect: " << num_aspect << std::endl;
 
-  int top_count = top[0]->count();
-  Dtype* top_data = top[0]->mutable_cpu_data();
-  caffe_set(top_count, Dtype(-FLT_MAX), top_data);
-  int* argmax_data = max_idx_.mutable_cpu_data();
-  caffe_set(top_count, -1, argmax_data);
+  cout << "scales: ";
+  for(int i = 0; i < num_scale; i++)
+    cout << scales[i] << " ";
+  cout << std::endl;
 
-  // For each ROI R = [batch_index x1 y1 x2 y2]: max pool over R
-  for (int n = 0; n < num_rois; ++n) {
-    int roi_batch_ind = bottom_rois[0];
-    int roi_start_w = round(bottom_rois[1] * spatial_scale_);
-    int roi_start_h = round(bottom_rois[2] * spatial_scale_);
-    int roi_end_w = round(bottom_rois[3] * spatial_scale_);
-    int roi_end_h = round(bottom_rois[4] * spatial_scale_);
-    CHECK_GE(roi_batch_ind, 0);
-    CHECK_LT(roi_batch_ind, batch_size);
+  cout << "scale mapping: ";
+  for(int i = 0; i < num_scale; i++)
+    cout << scale_mapping[i] << " ";
+  cout << std::endl;
 
-    int roi_height = max(roi_end_h - roi_start_h + 1, 1);
-    int roi_width = max(roi_end_w - roi_start_w + 1, 1);
-    const Dtype bin_size_h = static_cast<Dtype>(roi_height)
-                             / static_cast<Dtype>(pooled_height_);
-    const Dtype bin_size_w = static_cast<Dtype>(roi_width)
-                             / static_cast<Dtype>(pooled_width_);
+  cout << "aspect heights: ";
+  for(int i = 0; i < num_aspect; i++)
+    cout << aspect_heights[i] << " ";
+  cout << std::endl;
 
-    const Dtype* batch_data = bottom_data + bottom[0]->offset(roi_batch_ind);
+  cout << "aspect widths: ";
+  for(int i = 0; i < num_aspect; i++)
+    cout << aspect_widths[i] << " ";
+  cout << std::endl;
 
-    for (int c = 0; c < channels_; ++c) {
-      for (int ph = 0; ph < pooled_height_; ++ph) {
-        for (int pw = 0; pw < pooled_width_; ++pw) {
-          // Compute pooling region for this output unit:
-          //  start (included) = floor(ph * roi_height / pooled_height_)
-          //  end (excluded) = ceil((ph + 1) * roi_height / pooled_height_)
-          int hstart = static_cast<int>(floor(static_cast<Dtype>(ph)
-                                              * bin_size_h));
-          int wstart = static_cast<int>(floor(static_cast<Dtype>(pw)
-                                              * bin_size_w));
-          int hend = static_cast<int>(ceil(static_cast<Dtype>(ph + 1)
-                                           * bin_size_h));
-          int wend = static_cast<int>(ceil(static_cast<Dtype>(pw + 1)
-                                           * bin_size_w));
+  // numbers
+  int num_batch = bottom[0]->num();
+  int num_image = num_batch / num_scale;
+  int rois_per_image = batch_size_ / num_image;
+  int fg_rois_per_image = int(fg_fraction_ * rois_per_image);
 
-          hstart = min(max(hstart + roi_start_h, 0), height_);
-          hend = min(max(hend + roi_start_h, 0), height_);
-          wstart = min(max(wstart + roi_start_w, 0), width_);
-          wend = min(max(wend + roi_start_w, 0), width_);
-
-          bool is_empty = (hend <= hstart) || (wend <= wstart);
-
-          const int pool_index = ph * pooled_width_ + pw;
-          if (is_empty) {
-            top_data[pool_index] = 0;
-            argmax_data[pool_index] = -1;
-          }
-
-          for (int h = hstart; h < hend; ++h) {
-            for (int w = wstart; w < wend; ++w) {
-              const int index = h * width_ + w;
-              if (batch_data[index] > top_data[pool_index]) {
-                top_data[pool_index] = batch_data[index];
-                argmax_data[pool_index] = index;
-              }
-            }
-          }
+  // compute heatmap
+  for(int n = 0; n < num_; n++)
+  {
+    for(int h = 0; h < height_; h++)
+    {
+      for(int w = 0; w < width_; w++)
+      {
+        // compute the max prob
+        Dtype max_value = -1;
+        for(int c = 1; c < channels_; c++)
+        {
+          Dtype value = bottom[0]->data_at(n, c, h, w);
+          if(value > max_value)
+            max_value = value;
         }
+        // store the max prob
+        int index = n * height_ * width_ + h * width_ + w;
+        heatmap.push_back(std::make_pair(max_value, index));
       }
-      // Increment all data pointers by one channel
-      batch_data += bottom[0]->offset(0, 1);
-      top_data += top[0]->offset(0, 1);
-      argmax_data += max_idx_.offset(0, 1);
     }
-    // Increment ROI data pointer
-    bottom_rois += bottom[1]->offset(1);
   }
+
+  // process the positive boxes
+  int num_positive = bottom[1]->num();
+  std::vector<std::pair<Dtype, int> > scores_positive_vector;
+  std::vector<int> sep_positive_vector(num_image+1, -1);
+  for(int i = 0; i < num_positive; i++)
+  {
+    int cx = int(bottom[1]->data_at(i, 0, 0, 0));
+    int cy = int(bottom[1]->data_at(i, 1, 0, 0));
+    int batch_index = int(bottom[1]->data_at(i, 2, 0, 0));
+    int index = batch_index * height_ * width_ + cy * width_ + cx;
+    scores_positive_vector.push_back(std::make_pair(heatmap[index].first, i));
+    // mask the heatmap location
+    heatmap[index].first = -1;
+    // check which image
+    int image_index = batch_index / num_scale;
+    sep_positive_vector[image_index+1] = i;
+  }
+
+  // select positive boxes for each image
+  std::vector<int> index_positive;
+  std::vector<int> count_image(num_image, 0);
+  for(int i = 0; i < num_image; i++)
+  {
+    // [start, end)
+    int start = sep_positive_vector[i] + 1;
+    int end = sep_positive_vector[i+1] + 1;
+    int num = end - start;
+
+    if(num <= fg_rois_per_image)
+    {
+      // use all the positives of this image
+      for(int j = start; j < end; j++) 
+        index_positive.push_back(j);
+      count_image[i] = num;
+    }
+    else
+    {
+      // select hard positives (low score positives)
+      std::partial_sort(
+        scores_positive_vector.begin() + start, scores_positive_vector.begin() + fg_rois_per_image,
+        scores_positive_vector.begin() + end, std::less<std::pair<Dtype, int> >());
+
+      for(int j = 0; j < fg_rois_per_image; j++) 
+        index_positive.push_back(scores_positive_vector[start+j].second);
+      count_image[i] = fg_rois_per_image;
+    }
+  }
+
+  // select negative boxes for each image
+  std::vector<int> index_negative;
+  for(int i = 0; i < num_image; i++)
+  {
+    // [start, end)
+    int start = i * num_scale * height_ * width_;
+    int end = (i+1) * num_scale * height_ * width_;
+    int num = rois_per_image - count_image[i];
+
+    // sort heatmap to select hard negatives (high score negatives)
+    std::partial_sort(
+      heatmap.begin() + start, heatmap.begin() + num,
+      heatmap.begin() + end, std::greater<std::pair<Dtype, int> >());
+
+    for(int j = 0; j < num; j++) 
+      index_negative.push_back(heatmap[start+j].second);
+  }
+
+  // build the blobs of interest
+  Dtype* rois = top[0]->mutable_cpu_data();
+  Dtype* rois_sub = top[1]->mutable_cpu_data();
+  Dtype* labels = top[2]->mutable_cpu_data();
+  Dtype* bbox_targets = top[3]->mutable_cpu_data();
+  Dtype* bbox_loss = top[4]->mutable_cpu_data();
+  Dtype* sublabels = top[5]->mutable_cpu_data();
+
+  caffe_set(top[0]->count(), Dtype(0), rois);
+  caffe_set(top[1]->count(), Dtype(0), rois_sub);
+  caffe_set(top[2]->count(), Dtype(0), labels);
+  caffe_set(top[3]->count(), Dtype(0), bbox_targets);
+  caffe_set(top[4]->count(), Dtype(0), bbox_loss);
+  caffe_set(top[5]->count(), Dtype(0), sublabels);
+
+  int count = 0;
+  // positives
+  for(int i = 0; i < index_positive.size(); i++)
+  {
+    int ind = index_positive[i];
+
+    for(int j = 0; j < 5; j++)
+      rois_sub[count*5 + j] = bottom[1]->data_at(ind, 2+j, 0, 0); // info_boxes[ind, 2:7]
+
+    for(int j = 0; j < 5; j++)
+      rois[count*5 + j] = bottom[1]->data_at(ind, 7+j, 0, 0); // info_boxes[ind, 7:12]
+
+    labels[count] = bottom[1]->data_at(ind, 12, 0, 0); // info_boxes[ind, 12]
+    sublabels[count] = bottom[1]->data_at(ind, 13, 0, 0); // info_boxes[ind, 13]
+
+    // bounding box regression
+    int cls = int(bottom[1]->data_at(ind, 12, 0, 0));
+    int start = 4 * cls;
+    for(int j = 0; j < 4; j++)
+    {
+      bbox_targets[count * 4 * num_classes_ + start + j] = bottom[1]->data_at(ind, 14 + j, 0, 0); // info_boxes[ind, 14:]
+      bbox_loss[count * 4 * num_classes_ + start + j] = 1.0;
+    }
+
+    count++;
+  }
+
+  /* initialize random seed: */
+  srand(time(NULL));
+
+  // negatives
+  for(int i = 0; i < index_negative.size(); i++)
+  {
+    int ind = index_negative[i];
+
+    // parse index
+    int batch_index = ind / (height_ * width_);
+    int tmp = ind % (height_ * width_);
+    int cy = tmp / width_;
+    int cx = tmp % width_;
+
+    // sample an aspect ratio
+    int aspect_index = rand() % num_aspect;
+    Dtype width = aspect_widths[aspect_index];
+    Dtype height = aspect_heights[aspect_index];
+
+    // scale mapping
+    int image_index = batch_index / num_scale;
+    int scale_index = batch_index % num_scale;
+    Dtype scale = scales[scale_index];
+
+    // check if the point is inside this scale
+    Dtype rescale = scale / scales[num_scale-1];
+    Dtype scale_map;
+    int batch_index_map;
+    if(cx < width_ * rescale && cy < height * rescale)
+    {
+      int scale_index_map = int(scale_mapping[scale_index]);
+      scale_map = scales[scale_index_map];
+      batch_index_map = image_index * num_scale + scale_index_map;
+    }
+    else
+    {
+      // do not do scale mapping
+      scale_map = scale;
+      batch_index_map = batch_index;
+    }
+
+    // assign information
+    rois_sub[count * 5 + 0] = batch_index;
+    rois_sub[count * 5 + 1] = (cx - width / 2) / spatial_scale_;
+    rois_sub[count * 5 + 2] = (cy - height / 2) / spatial_scale_;
+    rois_sub[count * 5 + 3] = (cx + width / 2) / spatial_scale_;
+    rois_sub[count * 5 + 4] = (cy + height / 2) / spatial_scale_;
+
+    rois[count * 5] = batch_index_map;
+    for(int j = 0; j < 4; j++)
+      rois[count * 5 + j + 1] = rois_sub[count * 5 + j + 1] * scale_map / scale;
+
+    count++;
+  }
+
+  assert(count == batch_size_);
 }
 
 template <typename Dtype>
 void ROIGeneratingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
-  NOT_IMPLEMENTED;
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) 
+{
+  // Initialize all the gradients to 0
+  if (propagate_down[0]) 
+  {
+    Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
+    caffe_set(bottom[0]->count(), Dtype(0), bottom_diff);
+  }
 }
-
-
-#ifdef CPU_ONLY
-STUB_GPU(ROIGeneratingLayer);
-#endif
 
 INSTANTIATE_CLASS(ROIGeneratingLayer);
 REGISTER_LAYER_CLASS(ROIGenerating);
