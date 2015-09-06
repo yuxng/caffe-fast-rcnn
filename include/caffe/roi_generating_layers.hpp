@@ -54,6 +54,38 @@ class ROIGeneratingLayer : public Layer<Dtype> {
   float spatial_scale_;  
 };
 
+/* HeatmapGeneratingLayer */
+template <typename Dtype>
+class HeatmapGeneratingLayer : public Layer<Dtype> {
+ public:
+  explicit HeatmapGeneratingLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "HeatmapGenerating"; }
+
+  virtual inline int MinBottomBlobs() const { return 1; }
+  virtual inline int MaxBottomBlobs() const { return 1; }
+  virtual inline int MinTopBlobs() const { return 1; }
+  virtual inline int MaxTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  int num_;
+  int channels_;
+  int height_;
+  int width_;
+
+  Blob<int> max_idx_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_ROI_GENERATING_LAYERS_HPP_

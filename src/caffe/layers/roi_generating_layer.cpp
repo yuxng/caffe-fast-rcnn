@@ -79,7 +79,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   int rois_per_image = batch_size_ / num_image;
   int fg_rois_per_image = int(fg_fraction_ * rois_per_image);
 
-  // compute heatmap
+  // build the heatmap vector
   clock_t time_begin = clock();
   for(int n = 0; n < num_; n++)
   {
@@ -87,17 +87,9 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     {
       for(int w = 0; w < width_; w++)
       {
-        // compute the max prob
-        Dtype max_value = -1;
-        for(int c = 1; c < channels_; c++)
-        {
-          Dtype value = bottom[0]->data_at(n, c, h, w);
-          if(value > max_value)
-            max_value = value;
-        }
-        // store the max prob
+        Dtype value = bottom[0]->data_at(n, 0, h, w);
         int index = n * height_ * width_ + h * width_ + w;
-        heatmap.push_back(std::make_pair(max_value, index));
+        heatmap.push_back(std::make_pair(value, index));
       }
     }
   }
