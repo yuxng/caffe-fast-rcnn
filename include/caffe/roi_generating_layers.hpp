@@ -32,8 +32,8 @@ class ROIGeneratingLayer : public Layer<Dtype> {
 
   virtual inline const char* type() const { return "ROIGenerating"; }
 
-  virtual inline int MinBottomBlobs() const { return 10; }
-  virtual inline int MaxBottomBlobs() const { return 10; }
+  virtual inline int MinBottomBlobs() const { return 3; }
+  virtual inline int MaxBottomBlobs() const { return 3; }
   virtual inline int MinTopBlobs() const { return 6; }
   virtual inline int MaxTopBlobs() const { return 6; }
 
