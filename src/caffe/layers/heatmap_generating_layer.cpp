@@ -16,6 +16,11 @@ using std::cout;
 namespace caffe {
 
 template <typename Dtype>
+void HeatmapGeneratingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top) {
+}
+
+template <typename Dtype>
 void HeatmapGeneratingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) 
 {
