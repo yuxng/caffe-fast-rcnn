@@ -1,5 +1,5 @@
 // ------------------------------------------------------------------
-// Fast R-CNN
+// Subcategory CNN
 // Copyright (c) 2015 CVGL Stanford
 // Licensed under The MIT License
 // Written by Yu Xiang
@@ -10,8 +10,6 @@
 # include <stdio.h>
 
 #include "caffe/roi_generating_layers.hpp"
-
-using std::cout;
 
 namespace caffe {
 
@@ -42,7 +40,6 @@ void HeatmapGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bott
   int* argmax_data = max_idx_.mutable_cpu_data();
 
   // compute heatmap
-  clock_t time_begin = clock();
   for(int n = 0; n < num_; n++)
   {
     for(int h = 0; h < height_; h++)
@@ -52,6 +49,7 @@ void HeatmapGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bott
         // compute the max prob
         Dtype max_value = Dtype(-1);
         int max_id = 0;
+        // channel 0 is for background
         for(int c = 1; c < channels_; c++)
         {
           Dtype value = bottom[0]->data_at(n, c, h, w);
@@ -68,9 +66,6 @@ void HeatmapGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bott
       }
     }
   }
-  clock_t time_end = clock();
-  double elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Compute heatmap: " << elapsed_secs << " second\n";
 }
 
 template <typename Dtype>
@@ -84,7 +79,6 @@ void HeatmapGeneratingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top
     Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
     caffe_set(bottom[0]->count(), Dtype(0), bottom_diff);
 
-    clock_t time_begin = clock();
     for(int n = 0; n < num_; n++)
     {
       for(int h = 0; h < height_; h++)
@@ -98,9 +92,6 @@ void HeatmapGeneratingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top
         }
       }
     }
-    clock_t time_end = clock();
-    double elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-    cout << "Compute heatmap gradient: " << elapsed_secs << " second\n";
   }
 }
 

@@ -1,5 +1,5 @@
 // ------------------------------------------------------------------
-// Fast R-CNN
+// Subcategory CNN
 // Copyright (c) 2015 CVGL Stanford
 // Licensed under The MIT License
 // Written by Yu Xiang
@@ -11,13 +11,6 @@
 # include <stdio.h>
 
 #include "caffe/roi_generating_layers.hpp"
-
-using std::max;
-using std::min;
-using std::floor;
-using std::ceil;
-using std::cout;
-
 
 namespace caffe {
 
@@ -81,24 +74,9 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   int fg_rois_per_image = int(fg_fraction_ * rois_per_image);
 
   // build the heatmap vector
-  clock_t time_begin = clock();
-  for(int n = 0; n < num_; n++)
-  {
-    for(int h = 0; h < height_; h++)
-    {
-      for(int w = 0; w < width_; w++)
-      {        
-        int index = n * height_ * width_ + h * width_ + w;
-        Dtype value = bottom_data[index];
-        heatmap.push_back(std::make_pair(value, index));
-      }
-    }
-  }
-  clock_t time_end = clock();
-  double elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Compute heatmap: " << elapsed_secs << " second\n";
+  for(int i = 0; i < bottom[0]->count(); i++)
+    heatmap.push_back(std::make_pair(bottom_data[i], i));
 
-  time_begin = clock();
   // process the positive boxes
   int num_positive = bottom[1]->num();
   std::vector<std::pair<Dtype, int> > scores_positive_vector;
@@ -116,11 +94,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     int image_index = batch_index / num_scale;
     sep_positive_vector[image_index+1] = i;
   }
-  time_end = clock();
-  elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Process positive boxes: " << elapsed_secs << " second\n";
 
-  time_begin = clock();
   // select positive boxes for each image
   std::vector<int> index_positive;
   std::vector<int> count_image(num_image, 0);
@@ -150,11 +124,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       count_image[i] = fg_rois_per_image;
     }
   }
-  time_end = clock();
-  elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Select positive boxes: " << elapsed_secs << " second\n";
 
-  time_begin = clock();
   // select negative boxes for each image
   std::vector<int> index_negative;
   for(int i = 0; i < num_image; i++)
@@ -172,9 +142,6 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     for(int j = 0; j < num; j++) 
       index_negative.push_back(heatmap[start+j].second);
   }
-  time_end = clock();
-  elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Select negative boxes: " << elapsed_secs << " second\n";
 
   // build the blobs of interest
   Dtype* rois = top[0]->mutable_cpu_data();
@@ -191,7 +158,6 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   caffe_set(top[4]->count(), Dtype(0), bbox_loss);
   caffe_set(top[5]->count(), Dtype(0), sublabels);
 
-  time_begin = clock();
   int count = 0;
   // positives
   for(int i = 0; i < index_positive.size(); i++)
@@ -218,11 +184,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
     count++;
   }
-  time_end = clock();
-  elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Construct positive output: " << elapsed_secs << " second\n";
 
-  time_begin = clock();
   /* initialize random seed: */
   srand(time(NULL));
 
@@ -277,9 +239,6 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
     count++;
   }
-  time_end = clock();
-  elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Construct negative output: " << elapsed_secs << " second\n";
 
   assert(count == batch_size_);
 }

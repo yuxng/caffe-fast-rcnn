@@ -9,8 +9,6 @@
 
 #include "caffe/roi_generating_layers.hpp"
 
-using std::cout;
-
 namespace caffe {
 
 template <typename Dtype>
@@ -28,6 +26,7 @@ __global__ void HeatmapGeneratingForward(const int nthreads, const Dtype* bottom
     int bottom_index_start = n * channels * height * width + h * width + w;
     Dtype max_value = Dtype(-1);
     int max_id = 0;
+    // channel 0 is for background
     for(int c = 1; c < channels; c++)
     {
       int bottom_index = bottom_index_start + c * height * width;
@@ -54,14 +53,10 @@ void HeatmapGeneratingLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bott
   int* argmax_data = max_idx_.mutable_gpu_data();
   int count = top[0]->count();
 
-  clock_t time_begin = clock();
   // NOLINT_NEXT_LINE(whitespace/operators)
   HeatmapGeneratingForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
       count, bottom_data, channels_, height_, width_, top_data, argmax_data);
   CUDA_POST_KERNEL_CHECK;
-  clock_t time_end = clock();
-  double elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Compute heatmap gpu: " << elapsed_secs << " second\n";
 }
 
 template <typename Dtype>
@@ -97,14 +92,10 @@ void HeatmapGeneratingLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top
   caffe_gpu_set(count, Dtype(0.), bottom_diff);
   const int* argmax_data = max_idx_.gpu_data();
 
-  clock_t time_begin = clock();
   // NOLINT_NEXT_LINE(whitespace/operators)
   HeatmapGeneratingBackward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
       count, top_diff, argmax_data, channels_, height_, width_, bottom_diff);
   CUDA_POST_KERNEL_CHECK;
-  clock_t time_end = clock();
-  double elapsed_secs = double(time_end - time_begin) / CLOCKS_PER_SEC;
-  cout << "Compute heatmap gradient gpu: " << elapsed_secs << " second\n";
 }
 
 INSTANTIATE_LAYER_GPU_FUNCS(HeatmapGeneratingLayer);
