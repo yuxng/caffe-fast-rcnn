@@ -62,6 +62,7 @@ template <typename Dtype>
 void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) 
 {
+  const Dtype* bottom_data = bottom[0]->cpu_data();
   const Dtype* bottom_parameters = bottom[2]->cpu_data();
   std::vector<std::pair<Dtype, int> > heatmap(num_ * height_ * width_);
 
@@ -86,9 +87,9 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     for(int h = 0; h < height_; h++)
     {
       for(int w = 0; w < width_; w++)
-      {
-        Dtype value = bottom[0]->data_at(n, 0, h, w);
+      {        
         int index = n * height_ * width_ + h * width_ + w;
+        Dtype value = bottom_data[index];
         heatmap.push_back(std::make_pair(value, index));
       }
     }
