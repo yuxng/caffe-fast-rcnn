@@ -219,7 +219,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     Dtype rescale = scale / scales[num_scale-1];
     Dtype scale_map;
     int batch_index_map;
-    if(cx < width_ * rescale && cy < height * rescale)
+    if(cx < width_ * rescale && cy < height_ * rescale)
     {
       int scale_index_map = int(scale_mapping[scale_index]);
       scale_map = scales[scale_index_map];
