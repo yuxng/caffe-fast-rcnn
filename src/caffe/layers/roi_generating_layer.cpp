@@ -122,7 +122,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     {
       // select hard positives (low score positives)
       std::partial_sort(
-        scores_positive_vector.begin() + start, scores_positive_vector.begin() + fg_rois_per_image,
+        scores_positive_vector.begin() + start, scores_positive_vector.begin() + start + fg_rois_per_image,
         scores_positive_vector.begin() + end, std::less<std::pair<Dtype, int> >());
 
       for(int j = 0; j < fg_rois_per_image; j++) 
@@ -176,7 +176,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     for(int j = 0; j < 5; j++)
       rois[count*5 + j] = bottom[1]->data_at(ind, 7+j, 0, 0); // info_boxes[ind, 7:12]
 
-    labels[count] = bottom[1]->data_at(ind, 12, 0, 0); // info_boxes[ind, 12]
+    labels[count] = bottom[1]->data_at(ind, 12, 0, 0);    // info_boxes[ind, 12]
     sublabels[count] = bottom[1]->data_at(ind, 13, 0, 0); // info_boxes[ind, 13]
 
     // bounding box regression
