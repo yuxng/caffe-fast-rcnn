@@ -48,6 +48,7 @@ class ROIGeneratingLayer : public Layer<Dtype> {
   int height_;
   int width_;
 
+  int flag_proposal_only_;
   int batch_size_;
   int num_classes_;
   float fg_fraction_;

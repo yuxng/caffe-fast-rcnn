@@ -768,10 +768,11 @@ message ROIPoolingParameter {
 
 // Message that stores parameters used by ROIGeneratingLayer
 message ROIGeneratingParameter {
-  optional uint32 batch_size = 1 [default = 64]; // The batch size in training
-  optional uint32 num_classes = 2 [default = 2]; // The number of classes
-  optional float fg_fraction = 3 [default = 0.25]; // The fraction of positive examples
-  optional float spatial_scale = 4 [default = 0.0625];
+  optional uint32 flag_proposal_only = 1 [default = 0];
+  optional uint32 batch_size = 2 [default = 64]; // The batch size in training
+  optional uint32 num_classes = 3 [default = 2]; // The number of classes
+  optional float fg_fraction = 4 [default = 0.25]; // The fraction of positive examples
+  optional float spatial_scale = 5 [default = 0.0625];
 }
 
 // Message that stores parameters used by SigmoidLayer
