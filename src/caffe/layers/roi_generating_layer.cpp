@@ -42,19 +42,19 @@ void ROIGeneratingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 
   // rois_sub
   top[0]->Reshape(batch_size_, 5, 1, 1);
+  // sublabels
+  top[1]->Reshape(batch_size_, 1, 1, 1);
 
   if(flag_proposal_only_ == 0)
   {
     // rois
-    top[1]->Reshape(batch_size_, 5, 1, 1);
+    top[2]->Reshape(batch_size_, 5, 1, 1);
     // labels
-    top[2]->Reshape(batch_size_, 1, 1, 1);
+    top[3]->Reshape(batch_size_, 1, 1, 1);
     // bbox targets
-    top[3]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
-    // bbox loss weights
     top[4]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
-    // sublabels
-    top[5]->Reshape(batch_size_, 1, 1, 1);
+    // bbox loss weights
+    top[5]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
   }
 }
 
@@ -157,25 +157,24 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   // build the blobs of interest
   Dtype* rois_sub = top[0]->mutable_cpu_data();
   caffe_set(top[0]->count(), Dtype(0), rois_sub);
+  Dtype* sublabels = top[1]->mutable_cpu_data();
+  caffe_set(top[1]->count(), Dtype(0), sublabels);
 
   Dtype* rois = NULL;
   Dtype* labels = NULL;
   Dtype* bbox_targets = NULL;
   Dtype* bbox_loss = NULL;
-  Dtype* sublabels = NULL;
   if(flag_proposal_only_ == 0)
   {
-    rois = top[1]->mutable_cpu_data();
-    labels = top[2]->mutable_cpu_data();
-    bbox_targets = top[3]->mutable_cpu_data();
-    bbox_loss = top[4]->mutable_cpu_data();
-    sublabels = top[5]->mutable_cpu_data();
+    rois = top[2]->mutable_cpu_data();
+    labels = top[3]->mutable_cpu_data();
+    bbox_targets = top[4]->mutable_cpu_data();
+    bbox_loss = top[5]->mutable_cpu_data();
 
-    caffe_set(top[1]->count(), Dtype(0), rois);
-    caffe_set(top[2]->count(), Dtype(0), labels);
-    caffe_set(top[3]->count(), Dtype(0), bbox_targets);
-    caffe_set(top[4]->count(), Dtype(0), bbox_loss);
-    caffe_set(top[5]->count(), Dtype(0), sublabels);
+    caffe_set(top[2]->count(), Dtype(0), rois);
+    caffe_set(top[3]->count(), Dtype(0), labels);
+    caffe_set(top[4]->count(), Dtype(0), bbox_targets);
+    caffe_set(top[5]->count(), Dtype(0), bbox_loss);    
   }
 
   int count = 0;
@@ -187,13 +186,14 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     for(int j = 0; j < 5; j++)
       rois_sub[count*5 + j] = bottom[1]->data_at(ind, 2+j, 0, 0); // info_boxes[ind, 2:7]
 
+    sublabels[count] = bottom[1]->data_at(ind, 13, 0, 0); // info_boxes[ind, 13]
+
     if(flag_proposal_only_ == 0)
     {
       for(int j = 0; j < 5; j++)
         rois[count*5 + j] = bottom[1]->data_at(ind, 7+j, 0, 0); // info_boxes[ind, 7:12]
 
       labels[count] = bottom[1]->data_at(ind, 12, 0, 0);    // info_boxes[ind, 12]
-      sublabels[count] = bottom[1]->data_at(ind, 13, 0, 0); // info_boxes[ind, 13]
 
       // bounding box regression
       int cls = int(bottom[1]->data_at(ind, 12, 0, 0));
