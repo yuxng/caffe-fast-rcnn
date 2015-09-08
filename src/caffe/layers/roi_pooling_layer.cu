@@ -34,8 +34,8 @@ __global__ void ROIPoolForward(const int nthreads, const Dtype* bottom_data,
     int roi_end_h = round(bottom_rois[4] * spatial_scale);
 
     // Force malformed ROIs to be 1x1
-    int roi_width = max(roi_end_w - roi_start_w + 1, 1);
-    int roi_height = max(roi_end_h - roi_start_h + 1, 1);
+    int roi_width = max(roi_end_w - roi_start_w, 1);
+    int roi_height = max(roi_end_h - roi_start_h, 1);
     Dtype bin_size_h = static_cast<Dtype>(roi_height)
                        / static_cast<Dtype>(pooled_height);
     Dtype bin_size_w = static_cast<Dtype>(roi_width)
@@ -134,8 +134,8 @@ __global__ void ROIPoolBackward(const int nthreads, const Dtype* top_diff,
       // this bottom unit
 
       // Force malformed ROIs to be 1x1
-      int roi_width = max(roi_end_w - roi_start_w + 1, 1);
-      int roi_height = max(roi_end_h - roi_start_h + 1, 1);
+      int roi_width = max(roi_end_w - roi_start_w, 1);
+      int roi_height = max(roi_end_h - roi_start_h, 1);
 
       Dtype bin_size_h = static_cast<Dtype>(roi_height)
                          / static_cast<Dtype>(pooled_height);

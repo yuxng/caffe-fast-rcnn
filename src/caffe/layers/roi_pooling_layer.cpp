@@ -66,8 +66,8 @@ void ROIPoolingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     CHECK_GE(roi_batch_ind, 0);
     CHECK_LT(roi_batch_ind, batch_size);
 
-    int roi_height = max(roi_end_h - roi_start_h + 1, 1);
-    int roi_width = max(roi_end_w - roi_start_w + 1, 1);
+    int roi_height = max(roi_end_h - roi_start_h, 1);
+    int roi_width = max(roi_end_w - roi_start_w, 1);
     const Dtype bin_size_h = static_cast<Dtype>(roi_height)
                              / static_cast<Dtype>(pooled_height_);
     const Dtype bin_size_w = static_cast<Dtype>(roi_width)
