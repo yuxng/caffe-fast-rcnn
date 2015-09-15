@@ -329,6 +329,7 @@ message LayerParameter {
   optional ReshapeParameter reshape_param = 133;
   optional ROIPoolingParameter roi_pooling_param = 8266711;
   optional ROIGeneratingParameter roi_generating_param = 8266712;
+  optional FeatureExtrapolatingParameter feature_extrapolating_param = 8266713;
   optional SigmoidParameter sigmoid_param = 124;
   optional SoftmaxParameter softmax_param = 125;
   optional SliceParameter slice_param = 126;
@@ -773,6 +774,13 @@ message ROIGeneratingParameter {
   optional uint32 num_classes = 3 [default = 2]; // The number of classes
   optional float fg_fraction = 4 [default = 0.25]; // The fraction of positive examples
   optional float spatial_scale = 5 [default = 0.0625];
+}
+
+// Message that stores parameters used by FeatureExtrapolatingLayer
+message FeatureExtrapolatingParameter {
+  optional uint32 num_per_octave = 1 [default = 8];
+  optional float min_scale = 2 [default = 0.25];
+  optional float max_scale = 3 [default = 4];
 }
 
 // Message that stores parameters used by SigmoidLayer
