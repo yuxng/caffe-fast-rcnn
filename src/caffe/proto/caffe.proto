@@ -778,9 +778,9 @@ message ROIGeneratingParameter {
 
 // Message that stores parameters used by FeatureExtrapolatingLayer
 message FeatureExtrapolatingParameter {
-  optional uint32 num_per_octave = 1 [default = 8];
-  optional float min_scale = 2 [default = 0.25];
-  optional float max_scale = 3 [default = 4];
+  optional uint32 num_per_octave = 1 [default = 4];
+  optional uint32 num_scale_base = 2 [default = 4];
+  optional string scale_string = 3 [default = "1"];
 }
 
 // Message that stores parameters used by SigmoidLayer

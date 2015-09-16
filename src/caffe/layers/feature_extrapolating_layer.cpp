@@ -9,6 +9,7 @@
 # include <ctime>
 # include <stdio.h>
 # include <math.h>
+# include <string>
 
 #include "caffe/roi_generating_layers.hpp"
 
@@ -23,10 +24,9 @@ void FeatureExtrapolatingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bo
   CHECK_GT(feature_extrapolating_param.num_per_octave(), 0)
       << "number of scales per octave must be > 0";
 
-  min_scale_ = feature_extrapolating_param.min_scale();
-  max_scale_ = feature_extrapolating_param.max_scale();
   num_per_octave_ = feature_extrapolating_param.num_per_octave();
-  num_scale_base_ = int(log2f(max_scale_ / min_scale_)) + 1;
+  scale_string_ = feature_extrapolating_param.scale_string();
+  num_scale_base_ = feature_extrapolating_param.num_scale_base();
   num_scale_ = (num_scale_base_ - 1) * num_per_octave_ + 1;
 }
 
@@ -38,6 +38,36 @@ void FeatureExtrapolatingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& botto
   channels_ = bottom[0]->channels();
   height_ = bottom[0]->height();
   width_ = bottom[0]->width();
+
+  // parse scale string
+  scales_base_.Reshape(num_scale_base_, 1, 1, 1);
+  double *scales_base = scales_base_.mutable_cpu_data();
+  std::size_t sz;
+  string str = scale_string_;
+  for(int i = 0; i < num_scale_base_; i++)
+  {
+    scales_base[i] = std::stod(str, &sz);
+    str = str.substr(sz);
+  }
+
+  // compute scales
+  scales_.Reshape(num_scale_, 1, 1, 1);
+  double* scales = scales_.mutable_cpu_data();
+  for(int i = 0; i < num_scale_; i++)
+  {
+    int index_scale_base = i / num_per_octave_;
+    double sbase = scales_base[index_scale_base];
+    int j = i % num_per_octave_;
+    double step = 0;
+    if(j == 0)
+      scales[i] = sbase;
+    else
+    {
+      double sbase_next = scales_base[index_scale_base+1];
+      step = (sbase_next - sbase) / num_per_octave_;
+      scales[i] = sbase + j * step;
+    }
+  }
 
   // counting
   num_image_ = num_ / num_scale_base_;
@@ -67,14 +97,12 @@ void FeatureExtrapolatingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& botto
   // rescaling factors
   rescaling_factors_.Reshape(num_scale_, 1, 1, 1);
   double* factors = rescaling_factors_.mutable_cpu_data();
-  double step = 1.0 / num_per_octave_;
   for(int i = 0; i < num_scale_; i++)
   {
     int scale_base_index = mapping[i];
-    // scale = min_scale_ * pow(2.0, i * step);
-    // scale_base = min_scale_ * pow(2.0, scale_base_index);
-    // scale / scale_base
-    factors[i] = pow(2.0, i * step - scale_base_index);
+    double scale_base = scales_base[scale_base_index];
+    double scale = scales[i];
+    factors[i] = scale / scale_base;
   }
 }
 

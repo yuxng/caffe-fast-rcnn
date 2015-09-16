@@ -63,9 +63,9 @@ TYPED_TEST(FeatureExtrapolatingLayerTest, TestGradient)
   LayerParameter layer_param;
   FeatureExtrapolatingParameter* feature_extrapolating_param =
       layer_param.mutable_feature_extrapolating_param();
-  feature_extrapolating_param->set_min_scale(0.25);
-  feature_extrapolating_param->set_max_scale(4);
-  feature_extrapolating_param->set_num_per_octave(8);
+  feature_extrapolating_param->set_num_scale_base(5);
+  feature_extrapolating_param->set_scale_string("0.25 0.5 1.0 2.0 3.0");
+  feature_extrapolating_param->set_num_per_octave(4);
   FeatureExtrapolatingLayer<Dtype> layer(layer_param);
   GradientChecker<Dtype> checker(1e-4, 1e-2);
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,

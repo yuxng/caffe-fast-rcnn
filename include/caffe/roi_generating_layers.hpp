@@ -131,11 +131,12 @@ class FeatureExtrapolatingLayer : public Layer<Dtype> {
   int num_scale_;
   int num_scale_base_;
   int num_per_octave_;
-  float min_scale_;
-  float max_scale_;
+  string scale_string_;
 
   Blob<int> is_real_scales_;
   Blob<int> which_base_scales_;
+  Blob<double> scales_base_;
+  Blob<double> scales_;
   Blob<double> rescaling_factors_;
   Blob<double> trace_;
 };
