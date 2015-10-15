@@ -46,15 +46,17 @@ void ROIGeneratingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   top[1]->Reshape(batch_size_, 1, 1, 1);
   // bbox targets
   top[2]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
-  // bbox loss weights
+  // bbox inside weights
   top[3]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
+  // bbox outside weights
+  top[4]->Reshape(batch_size_, 4 * num_classes_, 1, 1);
 
   if(flag_proposal_only_ == 0)
   {
     // rois
-    top[4]->Reshape(batch_size_, 5, 1, 1);
+    top[5]->Reshape(batch_size_, 5, 1, 1);
     // labels
-    top[5]->Reshape(batch_size_, 1, 1, 1);
+    top[6]->Reshape(batch_size_, 1, 1, 1);
   }
 }
 
@@ -164,18 +166,21 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   Dtype* bbox_targets = top[2]->mutable_cpu_data();
   caffe_set(top[2]->count(), Dtype(0), bbox_targets);
 
-  Dtype* bbox_loss = top[3]->mutable_cpu_data();
-  caffe_set(top[3]->count(), Dtype(0), bbox_loss);
+  Dtype* bbox_inside_weights = top[3]->mutable_cpu_data();
+  caffe_set(top[3]->count(), Dtype(0), bbox_inside_weights);
+
+  Dtype* bbox_outside_weights = top[4]->mutable_cpu_data();
+  caffe_set(top[4]->count(), Dtype(0), bbox_outside_weights);
 
   Dtype* rois = NULL;
   Dtype* labels = NULL;
   if(flag_proposal_only_ == 0)
   {
-    rois = top[4]->mutable_cpu_data();
-    labels = top[5]->mutable_cpu_data();
+    rois = top[5]->mutable_cpu_data();
+    labels = top[6]->mutable_cpu_data();
 
-    caffe_set(top[4]->count(), Dtype(0), rois);
-    caffe_set(top[5]->count(), Dtype(0), labels);
+    caffe_set(top[5]->count(), Dtype(0), rois);
+    caffe_set(top[6]->count(), Dtype(0), labels);
   }
 
   int count = 0;
@@ -195,7 +200,8 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     for(int j = 0; j < 4; j++)
     {
       bbox_targets[count * 4 * num_classes_ + start + j] = bottom[1]->data_at(ind, 14 + j, 0, 0); // info_boxes[ind, 14:]
-      bbox_loss[count * 4 * num_classes_ + start + j] = 1.0;
+      bbox_inside_weights[count * 4 * num_classes_ + start + j] = 1.0;
+      bbox_outside_weights[count * 4 * num_classes_ + start + j] = 1.0;
     }
 
     if(flag_proposal_only_ == 0)

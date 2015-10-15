@@ -35,7 +35,7 @@ class ROIGeneratingLayer : public Layer<Dtype> {
   virtual inline int MinBottomBlobs() const { return 3; }
   virtual inline int MaxBottomBlobs() const { return 3; }
   virtual inline int MinTopBlobs() const { return 2; }
-  virtual inline int MaxTopBlobs() const { return 6; }
+  virtual inline int MaxTopBlobs() const { return 7; }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
