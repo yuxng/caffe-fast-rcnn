@@ -201,7 +201,7 @@ void ROIGeneratingLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     {
       bbox_targets[count * 4 * num_classes_ + start + j] = bottom[1]->data_at(ind, 14 + j, 0, 0); // info_boxes[ind, 14:]
       bbox_inside_weights[count * 4 * num_classes_ + start + j] = 1.0;
-      bbox_outside_weights[count * 4 * num_classes_ + start + j] = 1.0 / fg_rois_per_image;
+      bbox_outside_weights[count * 4 * num_classes_ + start + j] = 1.0;
     }
 
     if(flag_proposal_only_ == 0)
